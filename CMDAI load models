@@ -1,0 +1,1940 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CMDAI LOAD MODELS - GGUF Models Browser</title>
+    <meta name="description" content="GGUF model browser for downloading from Hugging Face. Sort by size, RAM, use case. Models: Qwen, Llama, Mistral, DeepSeek, Phi, Gemma.">
+    <meta name="keywords" content="GGUF, LLM, AI models, Qwen, Llama, Mistral, DeepSeek, Phi, Gemma, Ollama, llama.cpp">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #fafafa;
+            color: #1a1a1a;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 280px;
+            background: white;
+            border-right: 1px solid #e5e7eb;
+            display: flex;
+            flex-direction: column;
+            padding: 20px 0;
+            transition: transform 0.3s ease;
+            position: fixed;
+            left: 0;
+            top: 0;
+            height: 100vh;
+            z-index: 100;
+            overflow-y: auto;
+        }
+
+        .sidebar.hidden { transform: translateX(-100%); }
+
+        .logo {
+            padding: 0 20px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, #000 0%, #333 100%);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 26px;
+        }
+
+        .logo-text {
+            font-size: 16px;
+            font-weight: 700;
+            color: #000;
+            line-height: 1.3;
+        }
+
+        .logo-subtitle {
+            font-size: 11px;
+            color: #6b7280;
+            font-weight: 500;
+        }
+
+        .nav-section { padding: 0 12px; }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 14px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.15s;
+            color: #6b7280;
+            margin-bottom: 4px;
+            font-size: 14px;
+        }
+
+        .nav-item:hover { background: #f3f4f6; }
+        .nav-item.active { background: #000; color: white; }
+        .nav-icon { font-size: 18px; width: 22px; text-align: center; }
+        .nav-text { font-weight: 600; flex: 1; }
+        .nav-badge {
+            background: #000;
+            color: white;
+            padding: 3px 9px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 700;
+        }
+        .nav-item.active .nav-badge { background: white; color: #000; }
+
+        .sidebar-footer {
+            margin-top: auto;
+            padding: 16px 20px;
+            border-top: 1px solid #e5e7eb;
+            font-size: 11px;
+            color: #9ca3af;
+        }
+
+        /* Main */
+        .main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            margin-left: 280px;
+            transition: margin-left 0.3s ease;
+        }
+        .main.expanded { margin-left: 0; }
+
+        /* Header */
+        .header {
+            background: white;
+            border-bottom: 1px solid #e5e7eb;
+            padding: 14px 24px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+
+        .menu-toggle {
+            width: 40px;
+            height: 40px;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            background: white;
+            display: none;
+        }
+
+        .search-container { flex: 1; max-width: 600px; position: relative; }
+        .search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #9ca3af; font-size: 14px; }
+        .search-input {
+            width: 100%;
+            padding: 12px 16px 12px 44px;
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            font-size: 14px;
+        }
+        .search-input:focus { outline: none; border-color: #000; background: white; }
+
+        /* Content */
+        .content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+            background: #fafafa;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .section-title { font-size: 24px; font-weight: 700; display: flex; align-items: center; gap: 12px; }
+
+        .sort-btn {
+            padding: 10px 16px;
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        /* Filters */
+        .filters {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+
+        .filter-section {
+            margin-bottom: 20px;
+        }
+
+        .filter-label {
+            font-size: 11px;
+            font-weight: 700;
+            color: #6b7280;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .filter-chip {
+            padding: 8px 16px;
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            color: #6b7280;
+            transition: all 0.15s;
+        }
+        .filter-chip:hover { border-color: #000; color: #000; }
+        .filter-chip.active { background: #000; color: white; border-color: #000; }
+
+        /* Badges */
+        .gguf-badge {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            padding: 3px 8px;
+            border-radius: 6px;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .category-tag {
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .category-text { background: #dbeafe; color: #1e40af; }
+        .category-code { background: #dcfce7; color: #166534; }
+        .category-reasoning { background: #fef3c7; color: #92400e; }
+        .category-chat { background: #fce7f3; color: #9d174d; }
+        .category-math { background: #e0e7ff; color: #3730a3; }
+        .category-multilingual { background: #f0fdf4; color: #166534; }
+
+        /* Models List */
+        .models-list { display: flex; flex-direction: column; gap: 14px; }
+
+        .model-card {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 14px;
+            padding: 20px;
+            display: flex;
+            gap: 18px;
+            align-items: flex-start;
+            transition: all 0.15s;
+        }
+        .model-card:hover { border-color: #d1d5db; box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+
+        .model-icon-wrapper { position: relative; flex-shrink: 0; }
+        .model-icon {
+            width: 56px;
+            height: 56px;
+            background: linear-gradient(135deg, #FFD21E 0%, #FF8811 100%);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+        }
+
+        .rank-badge {
+            position: absolute;
+            top: -10px;
+            left: -10px;
+            font-size: 12px;
+            font-weight: 800;
+            padding: 4px 10px;
+            border-radius: 8px;
+            z-index: 1;
+            color: white;
+        }
+        .rank-badge.gold { background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%); }
+        .rank-badge.silver { background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%); }
+        .rank-badge.bronze { background: linear-gradient(135deg, #d97706 0%, #92400e 100%); }
+        .rank-badge.normal { background: #000; }
+
+        .model-content { flex: 1; min-width: 0; }
+        .model-title { font-size: 16px; font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+        .model-author { font-size: 13px; color: #6b7280; margin-bottom: 12px; }
+
+        .model-specs {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-bottom: 14px;
+            background: #f9fafb;
+            padding: 14px;
+            border-radius: 10px;
+        }
+        .spec-item { display: flex; flex-direction: column; gap: 3px; }
+        .spec-label { font-size: 10px; color: #9ca3af; font-weight: 600; text-transform: uppercase; }
+        .spec-value { font-size: 14px; font-weight: 700; color: #1f2937; }
+
+        .model-stats {
+            display: flex;
+            gap: 18px;
+            font-size: 13px;
+            color: #6b7280;
+            margin-bottom: 12px;
+        }
+        .stat { display: flex; align-items: center; gap: 5px; }
+
+        .model-description {
+            font-size: 13px;
+            color: #6b7280;
+            line-height: 1.6;
+            margin-bottom: 14px;
+        }
+
+        .model-usecases {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            margin-bottom: 14px;
+        }
+
+        .model-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+        .btn {
+            padding: 10px 16px;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.15s;
+        }
+        .btn-primary { background: #000; color: white; border-color: #000; }
+        .btn-primary:hover { background: #1a1a1a; }
+        .btn-secondary { background: white; color: #6b7280; }
+        .btn-secondary:hover { background: #f9fafb; border-color: #d1d5db; }
+        .btn-danger { background: #fef2f2; color: #ef4444; border-color: #fecaca; }
+        .btn-danger:hover { background: #fee2e2; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* Vote */
+        .vote-buttons { display: flex; gap: 8px; margin-top: 14px; }
+        .vote-btn {
+            padding: 6px 14px;
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.15s;
+        }
+        .vote-count { font-size: 12px; font-weight: 700; }
+        .vote-btn.upvoted { background: #10b981; border-color: #10b981; color: white; }
+        .vote-btn.downvoted { background: #ef4444; border-color: #ef4444; color: white; }
+
+        /* Progress */
+        .progress-container { display: none; margin-top: 14px; }
+        .progress-container.active { display: block; }
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: #e5e7eb;
+            border-radius: 2px;
+            overflow: hidden;
+            margin-bottom: 6px;
+        }
+        .progress-fill { height: 100%; background: #000; transition: width 0.3s; }
+        .progress-info {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            color: #6b7280;
+            font-weight: 600;
+        }
+
+        /* Status */
+        .status-bar {
+            background: #f0fdf4;
+            border: 1px solid #86efac;
+            border-radius: 10px;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            color: #166534;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #10b981;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: white;
+            border-radius: 14px;
+            max-width: 700px;
+            width: 90%;
+            max-height: 85vh;
+            overflow-y: auto;
+        }
+        .modal-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            background: white;
+        }
+        .modal-title { font-size: 18px; font-weight: 700; }
+        .modal-close {
+            width: 36px;
+            height: 36px;
+            border: none;
+            background: #f3f4f6;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 22px;
+        }
+        .modal-body { padding: 24px; }
+
+        /* Model Info Grid */
+        .model-info-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .model-info-item {
+            background: #f9fafb;
+            border-radius: 10px;
+            padding: 14px;
+        }
+        .model-info-label { font-size: 11px; color: #6b7280; margin-bottom: 4px; }
+        .model-info-value { font-size: 15px; font-weight: 700; }
+
+        /* GGUF Files List */
+        .gguf-files-list {
+            max-height: 250px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+        }
+        .gguf-file-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 14px;
+            background: #f9fafb;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            transition: all 0.15s;
+        }
+        .gguf-file-item:hover { background: #f3f4f6; }
+        .gguf-file-name { font-size: 13px; font-weight: 600; }
+        .gguf-file-size { font-size: 12px; color: #6b7280; }
+
+        /* Best Models Section */
+        .best-models-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 18px;
+            margin-bottom: 28px;
+        }
+
+        .best-model-card {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 14px;
+            padding: 20px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.2s;
+        }
+        .best-model-card:hover { 
+            border-color: #d1d5db; 
+            box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+            transform: translateY(-2px);
+        }
+        .best-model-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #000, #333);
+        }
+        .best-model-card.gold::before { background: linear-gradient(90deg, #fbbf24, #f59e0b); }
+        .best-model-card.silver::before { background: linear-gradient(90deg, #9ca3af, #6b7280); }
+        .best-model-card.bronze::before { background: linear-gradient(90deg, #d97706, #92400e); }
+
+        .best-model-rank {
+            position: absolute;
+            top: 14px;
+            right: 14px;
+            width: 32px;
+            height: 32px;
+            background: #000;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 800;
+        }
+        .best-model-card.gold .best-model-rank { background: linear-gradient(135deg, #fbbf24, #f59e0b); }
+        .best-model-card.silver .best-model-rank { background: linear-gradient(135deg, #9ca3af, #6b7280); }
+        .best-model-card.bronze .best-model-rank { background: linear-gradient(135deg, #d97706, #92400e); }
+
+        .best-model-name { font-size: 17px; font-weight: 700; margin-bottom: 4px; padding-right: 40px; }
+        .best-model-author { font-size: 12px; color: #6b7280; margin-bottom: 14px; }
+        .best-model-specs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 14px;
+        }
+        .spec-badge {
+            padding: 5px 12px;
+            background: #f3f4f6;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        /* Downloads */
+        .download-item {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 14px;
+            padding: 18px;
+            margin-bottom: 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .download-info { flex: 1; }
+        .download-name { font-size: 15px; font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 10px; }
+        .download-details { font-size: 13px; color: #6b7280; line-height: 1.6; }
+        .download-actions { display: flex; gap: 8px; margin-left: 16px; }
+
+        .empty-state { text-align: center; padding: 60px 20px; }
+        .empty-icon { font-size: 60px; margin-bottom: 16px; opacity: 0.3; }
+        .empty-text { font-size: 15px; color: #6b7280; }
+
+        /* Info Banner */
+        .info-banner {
+            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+            border: 1px solid #93c5fd;
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-bottom: 20px;
+        }
+        .info-banner h3 {
+            font-size: 14px;
+            font-weight: 700;
+            color: #1e40af;
+            margin-bottom: 8px;
+        }
+        .info-banner p {
+            font-size: 13px;
+            color: #1e40af;
+            line-height: 1.6;
+        }
+
+        /* Settings */
+        .settings-section {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 14px;
+            padding: 22px;
+            margin-bottom: 18px;
+        }
+        .settings-title { font-size: 15px; font-weight: 700; margin-bottom: 16px; display: flex; align-items: center; gap: 10px; }
+        .form-group { margin-bottom: 18px; }
+        .form-label { display: block; margin-bottom: 8px; font-weight: 600; font-size: 13px; color: #6b7280; }
+        .folder-selector { display: flex; gap: 10px; }
+        .folder-path {
+            flex: 1;
+            padding: 12px 16px;
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            font-size: 14px;
+            color: #6b7280;
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            padding: 14px 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+            z-index: 1000;
+            font-size: 14px;
+            font-weight: 600;
+            animation: slideIn 0.3s ease;
+        }
+        .toast.success { border-color: #10b981; color: #10b981; }
+        .toast.error { border-color: #ef4444; color: #ef4444; }
+        @keyframes slideIn { from { transform: translateX(400px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .model-specs { grid-template-columns: repeat(2, 1fr); }
+            .model-info-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        @media (max-width: 768px) {
+            .sidebar { transform: translateX(-100%); width: 280px; }
+            .main { margin-left: 0; }
+            .menu-toggle { display: flex; }
+            .header { padding: 12px 16px; }
+            .content { padding: 16px; }
+            .model-specs { grid-template-columns: 1fr 1fr; }
+            .best-models-grid { grid-template-columns: 1fr; }
+            .download-item { flex-direction: column; align-items: flex-start; }
+            .download-actions { margin-left: 0; margin-top: 12px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar" id="sidebar">
+        <div class="logo">
+            <div class="logo-icon">🤖</div>
+            <div>
+                <div class="logo-text">CMDAI</div>
+                <div class="logo-subtitle">LOAD MODELS</div>
+            </div>
+        </div>
+        <div class="nav-section">
+            <div class="nav-item active" data-tab="browse">
+                <span class="nav-icon">🔍</span>
+                <span class="nav-text">Browse GGUF</span>
+            </div>
+            <div class="nav-item" data-tab="ranking">
+                <span class="nav-icon">🏆</span>
+                <span class="nav-text">TOP 20 Ranking</span>
+            </div>
+            <div class="nav-item" data-tab="categories">
+                <span class="nav-icon">📊</span>
+                <span class="nav-text">By Category</span>
+            </div>
+            <div class="nav-item" data-tab="downloads">
+                <span class="nav-icon">📥</span>
+                <span class="nav-text">Downloaded</span>
+                <span class="nav-badge" id="downloadsBadge">0</span>
+            </div>
+            <div class="nav-item" data-tab="settings">
+                <span class="nav-icon">⚙️</span>
+                <span class="nav-text">Settings</span>
+            </div>
+        </div>
+        <div class="sidebar-footer">
+            <div>Data from Hugging Face</div>
+            <div style="margin-top: 4px; color: #6b7280;">
+                Ready for GitHub Pages
+            </div>
+        </div>
+    </div>
+
+    <div class="main" id="mainContent">
+        <div class="header">
+            <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
+            <div class="search-container">
+                <span class="search-icon">🔍</span>
+                <input type="text" class="search-input" id="searchInput" placeholder="Search GGUF models...">
+            </div>
+        </div>
+
+        <div class="content">
+            <!-- Browse -->
+            <div id="browseTab" class="tab-content">
+                <div class="section-header">
+                    <h2 class="section-title">GGUF Models <span class="gguf-badge">GGUF Only</span></h2>
+                    <select class="sort-btn" id="sortSelect" onchange="sortModels()">
+                        <option value="rank">Ranking</option>
+                        <option value="downloads">Most Downloads</option>
+                        <option value="likes">Most Likes</option>
+                        <option value="size">Size (ascending)</option>
+                        <option value="size-desc">Size (descending)</option>
+                        <option value="ram">RAM (ascending)</option>
+                    </select>
+                </div>
+
+                <div class="status-bar">
+                    <div class="status-dot"></div>
+                    <span id="statusText">GGUF models loaded — ready to download</span>
+                </div>
+
+                <div class="filter-section">
+                    <div class="filter-label">Use Case</div>
+                    <div class="filters" id="useCaseFilters">
+                        <div class="filter-chip active" data-filter="all">🌐 All</div>
+                        <div class="filter-chip" data-filter="text">📝 Text</div>
+                        <div class="filter-chip" data-filter="code">💻 Code</div>
+                        <div class="filter-chip" data-filter="reasoning">🧠 Reasoning</div>
+                        <div class="filter-chip" data-filter="chat">💬 Chat</div>
+                        <div class="filter-chip" data-filter="math">🔢 Math</div>
+                        <div class="filter-chip" data-filter="multilingual">🌍 Multilingual</div>
+                    </div>
+                </div>
+
+                <div class="filter-section">
+                    <div class="filter-label">Model Family</div>
+                    <div class="filters" id="familyFilters">
+                        <div class="filter-chip active" data-filter="all">All</div>
+                        <div class="filter-chip" data-filter="qwen">Qwen</div>
+                        <div class="filter-chip" data-filter="llama">Llama</div>
+                        <div class="filter-chip" data-filter="mistral">Mistral</div>
+                        <div class="filter-chip" data-filter="phi">Phi</div>
+                        <div class="filter-chip" data-filter="gemma">Gemma</div>
+                        <div class="filter-chip" data-filter="deepseek">DeepSeek</div>
+                    </div>
+                </div>
+
+                <div class="models-list" id="modelsList"></div>
+            </div>
+
+            <!-- Ranking -->
+            <div id="rankingTab" class="tab-content" style="display: none;">
+                <div class="section-header">
+                    <h2 class="section-title">🏆 TOP 20 GGUF Model Ranking</h2>
+                </div>
+
+                <div class="info-banner">
+                    <h3>📊 Ranking Methodology</h3>
+                    <p>Ranking based on: popularity (downloads), quality (likes), efficiency (size/parameters) and versatility (use cases).</p>
+                </div>
+
+                <div class="models-list" id="rankingList"></div>
+            </div>
+
+            <!-- Categories -->
+            <div id="categoriesTab" class="tab-content" style="display: none;">
+                <div class="section-header">
+                    <h2 class="section-title">📊 Models by Category</h2>
+                </div>
+
+                <div class="info-banner">
+                    <h3>🏷️ Use Case Categories</h3>
+                    <p>Models are categorized by their primary use cases. Some models may belong to multiple categories.</p>
+                </div>
+
+                <div id="categoriesContent"></div>
+            </div>
+
+            <!-- Downloads -->
+            <div id="downloadsTab" class="tab-content" style="display: none;">
+                <div class="section-header">
+                    <h2 class="section-title">📥 Downloaded Models</h2>
+                    <button class="btn btn-danger" onclick="clearAllDownloads()" id="clearAllBtn" style="display: none;">
+                        🗑️ Remove All
+                    </button>
+                </div>
+
+                <div class="info-banner" id="downloadsInfo" style="display: none;">
+                    <h3>ℹ️ Downloaded Models Info</h3>
+                    <p>Models are saved locally in the selected folder. The list below tracks downloaded files. You can remove individual models or clear the entire list.</p>
+                </div>
+
+                <div id="downloadsList"></div>
+            </div>
+
+            <!-- Settings -->
+            <div id="settingsTab" class="tab-content" style="display: none;">
+                <div class="section-header">
+                    <h2 class="section-title">Settings</h2>
+                </div>
+                
+                <div class="settings-section">
+                    <h3 class="settings-title">📁 Download Location</h3>
+                    <div class="form-group">
+                        <label class="form-label">Folder for saving GGUF models</label>
+                        <div class="folder-selector">
+                            <div class="folder-path" id="folderPath">No folder selected — click "Browse"</div>
+                            <button class="btn btn-primary" onclick="selectFolder()">Browse</button>
+                        </div>
+                        <p style="font-size: 12px; color: #6b7280; margin-top: 10px;">
+                            ⚠️ Requires Chrome/Edge browser with File System Access API
+                        </p>
+                    </div>
+                </div>
+                
+                <div class="settings-section">
+                    <h3 class="settings-title">ℹ️ About the GGUF Format</h3>
+                    <p style="font-size: 14px; color: #4b5563; line-height: 1.7; margin-bottom: 18px;">
+                        <strong>GGUF (GPT-Generated Unified Format)</strong> is a format optimized for running LLM models on consumer hardware through quantization.
+                    </p>
+                    
+                    <h4 style="font-size: 14px; font-weight: 700; margin-bottom: 12px;">Quantization Types:</h4>
+                    <div class="model-info-grid">
+                        <div class="model-info-item">
+                            <div class="model-info-label">Q4_K_M</div>
+                            <div class="model-info-value">Best balance<br><span style="font-size: 11px; color: #6b7280; font-weight: 400;">~60% of original size</span></div>
+                        </div>
+                        <div class="model-info-item">
+                            <div class="model-info-label">Q5_K_M</div>
+                            <div class="model-info-value">Higher quality<br><span style="font-size: 11px; color: #6b7280; font-weight: 400;">~70% of original size</span></div>
+                        </div>
+                        <div class="model-info-item">
+                            <div class="model-info-label">Q8_0</div>
+                            <div class="model-info-value">Highest precision<br><span style="font-size: 11px; color: #6b7280; font-weight: 400;">~80% of original size</span></div>
+                        </div>
+                    </div>
+                    
+                    <h4 style="font-size: 14px; font-weight: 700; margin: 18px 0 12px;">RAM Requirements:</h4>
+                    <p style="font-size: 14px; color: #4b5563; line-height: 1.8;">
+                        • <strong>1–3B model</strong>: ~2–4 GB RAM<br>
+                        • <strong>7B model (Q4)</strong>: ~5–8 GB RAM<br>
+                        • <strong>14B model (Q4)</strong>: ~9–12 GB RAM<br>
+                        • <strong>32B model (Q4)</strong>: ~20–24 GB RAM<br>
+                        • <strong>70B+ model (Q4)</strong>: ~40+ GB RAM
+                    </p>
+                </div>
+                
+                <div class="settings-section">
+                    <h3 class="settings-title">🗑️ Data Management</h3>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <button class="btn btn-secondary" onclick="clearDownloadsList()">🗑️ Clear Download List</button>
+                        <button class="btn btn-danger" onclick="clearAllData()">⚠️ Clear All Data</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modelModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modalTitle">Model</h3>
+                <button class="modal-close" onclick="closeModal()">×</button>
+            </div>
+            <div class="modal-body" id="modalContent"></div>
+        </div>
+    </div>
+
+    <div id="toastContainer"></div>
+
+    <script>
+        // ===================== MODELS DATABASE =====================
+        const MODELS_DATABASE = [
+            // ==== QWEN ====
+            {
+                id: 'Qwen/Qwen2.5-7B-Instruct-GGUF',
+                name: 'Qwen2.5-7B-Instruct',
+                author: 'Qwen',
+                family: 'qwen',
+                downloads: 2800000,
+                likes: 9200,
+                description: 'The latest Qwen2.5 model in the 7B version. A great general-purpose model with excellent multilingual support. Perfect for getting started.',
+                params: '7B',
+                ggufSizeGB: 4.7,
+                quantType: 'Q4_K_M',
+                ramRequired: '~8 GB',
+                useCases: ['text', 'code', 'chat', 'multilingual'],
+                ranking: 95,
+                ggufFiles: [
+                    { path: 'qwen2.5-7b-instruct-q4_k_m.gguf', size: 4930000000 },
+                    { path: 'qwen2.5-7b-instruct-q5_k_m.gguf', size: 5600000000 },
+                    { path: 'qwen2.5-7b-instruct-q8_0.gguf', size: 7600000000 }
+                ]
+            },
+            {
+                id: 'Qwen/Qwen2.5-14B-Instruct-GGUF',
+                name: 'Qwen2.5-14B-Instruct',
+                author: 'Qwen',
+                family: 'qwen',
+                downloads: 1400000,
+                likes: 5100,
+                description: 'Larger version of Qwen2.5 with better response quality and deeper reasoning.',
+                params: '14B',
+                ggufSizeGB: 9.0,
+                quantType: 'Q4_K_M',
+                ramRequired: '~12 GB',
+                useCases: ['text', 'code', 'chat', 'reasoning', 'multilingual'],
+                ranking: 94,
+                ggufFiles: [
+                    { path: 'qwen2.5-14b-instruct-q4_k_m.gguf', size: 9500000000 },
+                    { path: 'qwen2.5-14b-instruct-q5_k_m.gguf', size: 10800000000 }
+                ]
+            },
+            {
+                id: 'Qwen/Qwen2.5-Coder-7B-Instruct-GGUF',
+                name: 'Qwen2.5-Coder-7B',
+                author: 'Qwen',
+                family: 'qwen',
+                downloads: 980000,
+                likes: 3800,
+                description: 'A model specifically trained for programming. One of the best coding models in its class.',
+                params: '7B',
+                ggufSizeGB: 4.7,
+                quantType: 'Q4_K_M',
+                ramRequired: '~8 GB',
+                useCases: ['code'],
+                ranking: 92,
+                ggufFiles: [
+                    { path: 'qwen2.5-coder-7b-instruct-q4_k_m.gguf', size: 4930000000 }
+                ]
+            },
+            {
+                id: 'Qwen/Qwen2.5-32B-Instruct-GGUF',
+                name: 'Qwen2.5-32B-Instruct',
+                author: 'Qwen',
+                family: 'qwen',
+                downloads: 620000,
+                likes: 2900,
+                description: 'Powerful 32B model with excellent quality.',
+                params: '32B',
+                ggufSizeGB: 20.0,
+                quantType: 'Q4_K_M',
+                ramRequired: '~24 GB',
+                useCases: ['text', 'code', 'reasoning', 'chat', 'multilingual'],
+                ranking: 93,
+                ggufFiles: [
+                    { path: 'qwen2.5-32b-instruct-q4_k_m.gguf', size: 21000000000 }
+                ]
+            },
+            {
+                id: 'Qwen/QwQ-32B-Preview-GGUF',
+                name: 'QwQ-32B-Preview',
+                author: 'Qwen',
+                family: 'qwen',
+                downloads: 780000,
+                likes: 3400,
+                description: 'A reasoning model from Qwen, competing with o1. Outstanding in logical tasks and mathematics.',
+                params: '32B',
+                ggufSizeGB: 20.0,
+                quantType: 'Q4_K_M',
+                ramRequired: '~24 GB',
+                useCases: ['reasoning', 'math', 'text'],
+                ranking: 91,
+                ggufFiles: [
+                    { path: 'qwq-32b-preview-q4_k_m.gguf', size: 21000000000 }
+                ]
+            },
+
+            // ==== LLAMA ====
+            {
+                id: 'meta-llama/Llama-3.2-3B-Instruct-GGUF',
+                name: 'Llama-3.2-3B-Instruct',
+                author: 'Meta',
+                family: 'llama',
+                downloads: 3600000,
+                likes: 14500,
+                description: 'The smallest Llama 3.2. Very fast, ideal for testing and chatbots.',
+                params: '3B',
+                ggufSizeGB: 2.0,
+                quantType: 'Q4_K_M',
+                ramRequired: '~4 GB',
+                useCases: ['chat', 'text'],
+                ranking: 89,
+                ggufFiles: [
+                    { path: 'llama-3.2-3b-instruct-q4_k_m.gguf', size: 2100000000 }
+                ]
+            },
+            {
+                id: 'meta-llama/Llama-3.2-1B-Instruct-GGUF',
+                name: 'Llama-3.2-1B-Instruct',
+                author: 'Meta',
+                family: 'llama',
+                downloads: 2100000,
+                likes: 7800,
+                description: 'The smallest Llama 3.2. Ultra fast, runs even on low-end hardware.',
+                params: '1B',
+                ggufSizeGB: 0.7,
+                quantType: 'Q4_K_M',
+                ramRequired: '~2 GB',
+                useCases: ['chat', 'text'],
+                ranking: 82,
+                ggufFiles: [
+                    { path: 'llama-3.2-1b-instruct-q4_k_m.gguf', size: 770000000 }
+                ]
+            },
+            {
+                id: 'meta-llama/Llama-3.1-8B-Instruct-GGUF',
+                name: 'Llama-3.1-8B-Instruct',
+                author: 'Meta',
+                family: 'llama',
+                downloads: 5200000,
+                likes: 18200,
+                description: 'One of the best 8B models. Excellent balance of quality and performance.',
+                params: '8B',
+                ggufSizeGB: 4.9,
+                quantType: 'Q4_K_M',
+                ramRequired: '~8 GB',
+                useCases: ['text', 'code', 'chat', 'reasoning'],
+                ranking: 96,
+                ggufFiles: [
+                    { path: 'Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf', size: 5200000000 },
+                    { path: 'Meta-Llama-3.1-8B-Instruct-Q5_K_M.gguf', size: 5900000000 }
+                ]
+            },
+            {
+                id: 'meta-llama/Llama-3.3-70B-Instruct-GGUF',
+                name: 'Llama-3.3-70B-Instruct',
+                author: 'Meta',
+                family: 'llama',
+                downloads: 1100000,
+                likes: 9800,
+                description: 'The latest 70B model from Meta. One of the best open-source models available.',
+                params: '70B',
+                ggufSizeGB: 42.0,
+                quantType: 'Q4_K_M',
+                ramRequired: '~48 GB',
+                useCases: ['text', 'code', 'reasoning', 'chat', 'math'],
+                ranking: 98,
+                ggufFiles: [
+                    { path: 'llama-3.3-70b-instruct-q4_k_m.gguf', size: 44000000000 }
+                ]
+            },
+
+            // ==== MISTRAL ====
+            {
+                id: 'mistralai/Mistral-7B-Instruct-v0.3-GGUF',
+                name: 'Mistral-7B-Instruct-v0.3',
+                author: 'Mistral AI',
+                family: 'mistral',
+                downloads: 2400000,
+                likes: 8900,
+                description: 'Model from Mistral AI in v0.3. Very efficient and versatile.',
+                params: '7B',
+                ggufSizeGB: 4.4,
+                quantType: 'Q4_K_M',
+                ramRequired: '~8 GB',
+                useCases: ['text', 'chat', 'code'],
+                ranking: 88,
+                ggufFiles: [
+                    { path: 'mistral-7b-instruct-v0.3-q4_k_m.gguf', size: 4600000000 }
+                ]
+            },
+            {
+                id: 'mistralai/Mixtral-8x7B-Instruct-v0.1-GGUF',
+                name: 'Mixtral-8x7B-Instruct',
+                author: 'Mistral AI',
+                family: 'mistral',
+                downloads: 1300000,
+                likes: 6800,
+                description: 'MoE model with 8 experts of 7B each. Excellent quality with efficient resource usage.',
+                params: '47B',
+                ggufSizeGB: 26.0,
+                quantType: 'Q4_K_M',
+                ramRequired: '~28 GB',
+                useCases: ['text', 'code', 'reasoning', 'chat'],
+                ranking: 90,
+                ggufFiles: [
+                    { path: 'mixtral-8x7b-instruct-v0.1-q4_k_m.gguf', size: 27000000000 }
+                ]
+            },
+            {
+                id: 'mistralai/Mistral-Small-24B-Instruct-2501-GGUF',
+                name: 'Mistral-Small-24B',
+                author: 'Mistral AI',
+                family: 'mistral',
+                downloads: 450000,
+                likes: 2400,
+                description: 'New 24B model from Mistral. Great quality-to-size ratio.',
+                params: '24B',
+                ggufSizeGB: 15.0,
+                quantType: 'Q4_K_M',
+                ramRequired: '~18 GB',
+                useCases: ['text', 'code', 'chat'],
+                ranking: 87,
+                ggufFiles: [
+                    { path: 'mistral-small-24b-instruct-q4_k_m.gguf', size: 15800000000 }
+                ]
+            },
+
+            // ==== PHI ====
+            {
+                id: 'microsoft/Phi-3.5-mini-instruct-GGUF',
+                name: 'Phi-3.5-mini-instruct',
+                author: 'Microsoft',
+                family: 'phi',
+                downloads: 1700000,
+                likes: 7500,
+                description: 'Small but powerful model from Microsoft. Phenomenal quality-to-size ratio.',
+                params: '3.8B',
+                ggufSizeGB: 2.3,
+                quantType: 'Q4_K_M',
+                ramRequired: '~4 GB',
+                useCases: ['text', 'chat', 'code'],
+                ranking: 86,
+                ggufFiles: [
+                    { path: 'Phi-3.5-mini-instruct-q4_k_m.gguf', size: 2400000000 }
+                ]
+            },
+            {
+                id: 'microsoft/Phi-4-mini-instruct-GGUF',
+                name: 'Phi-4-mini-instruct',
+                author: 'Microsoft',
+                family: 'phi',
+                downloads: 320000,
+                likes: 1800,
+                description: 'The latest model from the Phi family. Even better quality-to-size ratio.',
+                params: '3.8B',
+                ggufSizeGB: 2.3,
+                quantType: 'Q4_K_M',
+                ramRequired: '~4 GB',
+                useCases: ['text', 'chat', 'code', 'reasoning'],
+                ranking: 88,
+                ggufFiles: [
+                    { path: 'Phi-4-mini-instruct-q4_k_m.gguf', size: 2400000000 }
+                ]
+            },
+
+            // ==== GEMMA ====
+            {
+                id: 'google/gemma-2-9b-it-GGUF',
+                name: 'Gemma-2-9B-IT',
+                author: 'Google',
+                family: 'gemma',
+                downloads: 1100000,
+                likes: 5400,
+                description: 'Model from Google in the Gemma 2 family. Excellent quality at a reasonable size.',
+                params: '9B',
+                ggufSizeGB: 5.8,
+                quantType: 'Q4_K_M',
+                ramRequired: '~10 GB',
+                useCases: ['text', 'code', 'chat'],
+                ranking: 85,
+                ggufFiles: [
+                    { path: 'gemma-2-9b-it-q4_k_m.gguf', size: 6100000000 }
+                ]
+            },
+            {
+                id: 'google/gemma-2-2b-it-GGUF',
+                name: 'Gemma-2-2B-IT',
+                author: 'Google',
+                family: 'gemma',
+                downloads: 640000,
+                likes: 3200,
+                description: 'The smallest Gemma 2 model. Very fast.',
+                params: '2B',
+                ggufSizeGB: 1.4,
+                quantType: 'Q4_K_M',
+                ramRequired: '~3 GB',
+                useCases: ['text', 'chat'],
+                ranking: 78,
+                ggufFiles: [
+                    { path: 'gemma-2-2b-it-q4_k_m.gguf', size: 1500000000 }
+                ]
+            },
+
+            // ==== DEEPSEEK ====
+            {
+                id: 'deepseek-ai/DeepSeek-R1-Distill-Qwen-7B-GGUF',
+                name: 'DeepSeek-R1-Distill-Qwen-7B',
+                author: 'DeepSeek',
+                family: 'deepseek',
+                downloads: 2100000,
+                likes: 8900,
+                description: 'Reasoning model from DeepSeek. Outstanding in logical tasks and mathematics.',
+                params: '7B',
+                ggufSizeGB: 4.7,
+                quantType: 'Q4_K_M',
+                ramRequired: '~8 GB',
+                useCases: ['reasoning', 'math', 'code'],
+                ranking: 94,
+                ggufFiles: [
+                    { path: 'DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf', size: 4930000000 }
+                ]
+            },
+            {
+                id: 'deepseek-ai/DeepSeek-R1-Distill-Llama-8B-GGUF',
+                name: 'DeepSeek-R1-Distill-Llama-8B',
+                author: 'DeepSeek',
+                family: 'deepseek',
+                downloads: 1100000,
+                likes: 5200,
+                description: 'DeepSeek R1 version based on Llama 8B. Excellent reasoning capabilities.',
+                params: '8B',
+                ggufSizeGB: 4.9,
+                quantType: 'Q4_K_M',
+                ramRequired: '~8 GB',
+                useCases: ['reasoning', 'math', 'code', 'text'],
+                ranking: 93,
+                ggufFiles: [
+                    { path: 'DeepSeek-R1-Distill-Llama-8B-Q4_K_M.gguf', size: 5200000000 }
+                ]
+            },
+            {
+                id: 'deepseek-ai/DeepSeek-R1-Distill-Qwen-14B-GGUF',
+                name: 'DeepSeek-R1-Distill-Qwen-14B',
+                author: 'DeepSeek',
+                family: 'deepseek',
+                downloads: 580000,
+                likes: 3100,
+                description: 'Larger version of the DeepSeek reasoning model.',
+                params: '14B',
+                ggufSizeGB: 9.0,
+                quantType: 'Q4_K_M',
+                ramRequired: '~12 GB',
+                useCases: ['reasoning', 'math', 'code', 'text'],
+                ranking: 95,
+                ggufFiles: [
+                    { path: 'DeepSeek-R1-Distill-Qwen-14B-Q4_K_M.gguf', size: 9500000000 }
+                ]
+            },
+            {
+                id: 'deepseek-ai/DeepSeek-Coder-V2-Lite-Instruct-GGUF',
+                name: 'DeepSeek-Coder-V2-Lite',
+                author: 'DeepSeek',
+                family: 'deepseek',
+                downloads: 420000,
+                likes: 2400,
+                description: 'Specialized programming model from DeepSeek.',
+                params: '16B',
+                ggufSizeGB: 10.0,
+                quantType: 'Q4_K_M',
+                ramRequired: '~14 GB',
+                useCases: ['code'],
+                ranking: 91,
+                ggufFiles: [
+                    { path: 'deepseek-coder-v2-lite-q4_k_m.gguf', size: 10500000000 }
+                ]
+            },
+
+            // ==== ADDITIONAL ====
+            {
+                id: 'TheBloke/Llama-2-7B-GGUF',
+                name: 'Llama-2-7B',
+                author: 'TheBloke',
+                family: 'llama',
+                downloads: 4200000,
+                likes: 11200,
+                description: 'Classic Llama 2 model. Still popular and useful.',
+                params: '7B',
+                ggufSizeGB: 4.2,
+                quantType: 'Q4_K_M',
+                ramRequired: '~8 GB',
+                useCases: ['text', 'chat'],
+                ranking: 75,
+                ggufFiles: [
+                    { path: 'llama-2-7b.Q4_K_M.gguf', size: 4400000000 }
+                ]
+            }
+        ];
+
+        // ===================== GLOBAL VARIABLES =====================
+        let allModels = [...MODELS_DATABASE];
+        let displayedModels = [...allModels];
+        let folderHandle = null;
+        let currentUseCaseFilter = 'all';
+        let currentFamilyFilter = 'all';
+
+        // ===================== INITIALIZATION =====================
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('CMDAI Load Models - Initializing...');
+            
+            initNavigation();
+            initFilters();
+            initSearch();
+            
+            // Load saved data
+            loadSavedData();
+            
+            renderModels(displayedModels);
+            renderRanking();
+            renderCategories();
+            updateBadge();
+            
+            console.log('CMDAI Load Models - Ready!');
+        });
+
+        function loadSavedData() {
+            try {
+                // Load folder
+                const savedFolder = localStorage.getItem('cmdai_folder');
+                if (savedFolder) {
+                    document.getElementById('folderPath').textContent = savedFolder;
+                }
+                
+                // Load and display downloaded models
+                renderDownloads();
+                updateBadge();
+                
+            } catch (e) {
+                console.error('Error loading data:', e);
+            }
+        }
+
+        function getDownloads() {
+            try {
+                const data = localStorage.getItem('cmdai_downloads');
+                return data ? JSON.parse(data) : [];
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function saveDownloads(downloads) {
+            try {
+                localStorage.setItem('cmdai_downloads', JSON.stringify(downloads));
+                console.log('Saved', downloads.length, 'downloaded models');
+            } catch (e) {
+                console.error('Error saving:', e);
+            }
+        }
+
+        function initNavigation() {
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+                    item.classList.add('active');
+                    
+                    const tab = item.dataset.tab;
+                    document.querySelectorAll('.tab-content').forEach(t => t.style.display = 'none');
+                    document.getElementById(tab + 'Tab').style.display = 'block';
+                    
+                    // Refresh downloads when switching to that tab
+                    if (tab === 'downloads') {
+                        renderDownloads();
+                    }
+                });
+            });
+        }
+
+        function initFilters() {
+            document.getElementById('useCaseFilters').addEventListener('click', (e) => {
+                if (e.target.classList.contains('filter-chip')) {
+                    document.querySelectorAll('#useCaseFilters .filter-chip').forEach(c => c.classList.remove('active'));
+                    e.target.classList.add('active');
+                    currentUseCaseFilter = e.target.dataset.filter;
+                    applyFilters();
+                }
+            });
+            
+            document.getElementById('familyFilters').addEventListener('click', (e) => {
+                if (e.target.classList.contains('filter-chip')) {
+                    document.querySelectorAll('#familyFilters .filter-chip').forEach(c => c.classList.remove('active'));
+                    e.target.classList.add('active');
+                    currentFamilyFilter = e.target.dataset.filter;
+                    applyFilters();
+                }
+            });
+        }
+
+        function initSearch() {
+            let timeout;
+            document.getElementById('searchInput').addEventListener('input', (e) => {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => {
+                    const q = e.target.value.toLowerCase();
+                    if (!q) {
+                        applyFilters();
+                    } else {
+                        displayedModels = allModels.filter(m => 
+                            m.name.toLowerCase().includes(q) ||
+                            m.author.toLowerCase().includes(q) ||
+                            m.description.toLowerCase().includes(q)
+                        );
+                        renderModels(displayedModels);
+                    }
+                }, 250);
+            });
+        }
+
+        // ===================== FILTERS & SORTING =====================
+        function applyFilters() {
+            let filtered = [...allModels];
+            
+            if (currentUseCaseFilter !== 'all') {
+                filtered = filtered.filter(m => m.useCases.includes(currentUseCaseFilter));
+            }
+            
+            if (currentFamilyFilter !== 'all') {
+                filtered = filtered.filter(m => m.family === currentFamilyFilter);
+            }
+            
+            displayedModels = filtered;
+            sortModels();
+        }
+
+        function sortModels() {
+            const sortValue = document.getElementById('sortSelect').value;
+            let sorted = [...displayedModels];
+            
+            switch(sortValue) {
+                case 'rank': sorted.sort((a, b) => (b.ranking || 0) - (a.ranking || 0)); break;
+                case 'downloads': sorted.sort((a, b) => b.downloads - a.downloads); break;
+                case 'likes': sorted.sort((a, b) => b.likes - a.likes); break;
+                case 'size': sorted.sort((a, b) => a.ggufSizeGB - b.ggufSizeGB); break;
+                case 'size-desc': sorted.sort((a, b) => b.ggufSizeGB - a.ggufSizeGB); break;
+                case 'ram': sorted.sort((a, b) => a.ggufSizeGB - b.ggufSizeGB); break;
+            }
+            
+            displayedModels = sorted;
+            renderModels(displayedModels);
+        }
+
+        // ===================== RENDERING =====================
+        function renderModels(models) {
+            const list = document.getElementById('modelsList');
+            
+            if (!models.length) {
+                list.innerHTML = '<div class="empty-state"><div class="empty-icon">🔍</div><p class="empty-text">No models to display</p></div>';
+                return;
+            }
+            
+            const downloads = getDownloads();
+            list.innerHTML = models.map((m, i) => createModelCard(m, i + 1, downloads)).join('');
+        }
+
+        function createModelCard(model, index, downloads) {
+            const isDownloaded = downloads.some(d => d.id === model.id);
+            const votes = getVotes(model.id);
+            const score = votes.up - votes.down;
+            
+            const rankClass = index <= 3 ? ['gold', 'silver', 'bronze'][index - 1] : 'normal';
+            
+            return `
+                <div class="model-card" data-id="${model.id}">
+                    <div class="model-icon-wrapper">
+                        ${index <= 10 ? `<div class="rank-badge ${rankClass}">#${index}</div>` : ''}
+                        <div class="model-icon">🤖</div>
+                    </div>
+                    <div class="model-content">
+                        <div class="model-title">
+                            ${model.name}
+                            <span class="gguf-badge">GGUF</span>
+                            ${isDownloaded ? '<span style="color: #10b981; font-size: 12px;">✅ Downloaded</span>' : ''}
+                        </div>
+                        <div class="model-author">by ${model.author} • ⭐ Ranking: ${model.ranking}/100</div>
+                        
+                        <div class="model-specs">
+                            <div class="spec-item">
+                                <div class="spec-label">Parameters</div>
+                                <div class="spec-value">${model.params}</div>
+                            </div>
+                            <div class="spec-item">
+                                <div class="spec-label">Size</div>
+                                <div class="spec-value">${model.ggufSizeGB} GB</div>
+                            </div>
+                            <div class="spec-item">
+                                <div class="spec-label">RAM</div>
+                                <div class="spec-value">${model.ramRequired}</div>
+                            </div>
+                            <div class="spec-item">
+                                <div class="spec-label">Quantization</div>
+                                <div class="spec-value">${model.quantType}</div>
+                            </div>
+                        </div>
+                        
+                        <div class="model-usecases">
+                            ${model.useCases.map(uc => `<span class="category-tag category-${uc}">${uc}</span>`).join('')}
+                        </div>
+                        
+                        <div class="model-stats">
+                            <div class="stat">⬇️ ${formatNumber(model.downloads)}</div>
+                            <div class="stat">❤️ ${formatNumber(model.likes)}</div>
+                            <div class="stat">👍 ${score > 0 ? '+' : ''}${score}</div>
+                        </div>
+                        
+                        <div class="model-description">${model.description}</div>
+                        
+                        <div class="model-actions">
+                            <button class="btn btn-primary" onclick="downloadModel('${model.id}')" ${isDownloaded ? 'disabled' : ''}>
+                                ${isDownloaded ? '✅ Downloaded' : '⬇️ Download'}
+                            </button>
+                            <button class="btn btn-secondary" onclick="showDetails('${model.id}')">ℹ️ Details</button>
+                        </div>
+                        
+                        <div class="vote-buttons">
+                            <button class="vote-btn ${votes.userVote === 'up' ? 'upvoted' : ''}" onclick="vote('${model.id}', 'up')">
+                                👍 <span class="vote-count">${votes.up}</span>
+                            </button>
+                            <button class="vote-btn ${votes.userVote === 'down' ? 'downvoted' : ''}" onclick="vote('${model.id}', 'down')">
+                                👎 <span class="vote-count">${votes.down}</span>
+                            </button>
+                        </div>
+                        
+                        <div class="progress-container" id="progress-${model.id.replace(/\//g, '-')}">
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="fill-${model.id.replace(/\//g, '-')}"></div>
+                            </div>
+                            <div class="progress-info">
+                                <span id="text-${model.id.replace(/\//g, '-')}">0%</span>
+                                <span id="speed-${model.id.replace(/\//g, '-')}"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderRanking() {
+            const list = document.getElementById('rankingList');
+            const downloads = getDownloads();
+            const top20 = [...allModels].sort((a, b) => (b.ranking || 0) - (a.ranking || 0)).slice(0, 20);
+            
+            list.innerHTML = top20.map((m, i) => createModelCard(m, i + 1, downloads)).join('');
+        }
+
+        function renderCategories() {
+            const container = document.getElementById('categoriesContent');
+            const categories = ['text', 'code', 'reasoning', 'chat', 'math', 'multilingual'];
+            
+            container.innerHTML = categories.map(cat => {
+                const models = allModels.filter(m => m.useCases.includes(cat)).sort((a, b) => (b.ranking || 0) - (a.ranking || 0));
+                const icon = {text: '📝', code: '💻', reasoning: '🧠', chat: '💬', math: '🔢', multilingual: '🌍'}[cat];
+                const title = {text: 'Text Generation', code: 'Programming', reasoning: 'Reasoning', chat: 'Conversations', math: 'Mathematics', multilingual: 'Multilingual'}[cat];
+                
+                return `
+                    <div class="settings-section" style="margin-bottom: 20px;">
+                        <h3 class="settings-title">${icon} ${title}</h3>
+                        <div class="models-list">
+                            ${models.slice(0, 5).map(m => `
+                                <div class="model-card" style="padding: 14px; cursor: pointer;" onclick="showDetails('${m.id}')">
+                                    <div style="flex: 1;">
+                                        <div style="font-weight: 700; font-size: 14px; margin-bottom: 4px;">${m.name}</div>
+                                        <div style="font-size: 12px; color: #6b7280;">
+                                            ${m.params} • ${m.ggufSizeGB} GB • ${m.ramRequired} RAM • ⭐ ${m.ranking}/100
+                                        </div>
+                                    </div>
+                                    <button class="btn btn-primary" onclick="event.stopPropagation(); downloadModel('${m.id}')" style="padding: 8px 14px;">⬇️</button>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderDownloads() {
+            const list = document.getElementById('downloadsList');
+            const downloads = getDownloads();
+            const clearBtn = document.getElementById('clearAllBtn');
+            const infoBanner = document.getElementById('downloadsInfo');
+            
+            console.log('Rendering downloads:', downloads.length);
+            
+            if (!downloads.length) {
+                list.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">📭</div>
+                        <p class="empty-text">No downloaded models</p>
+                        <p style="font-size: 13px; color: #9ca3af; margin-top: 8px;">Download models from the "Browse GGUF" tab</p>
+                    </div>
+                `;
+                clearBtn.style.display = 'none';
+                infoBanner.style.display = 'none';
+                return;
+            }
+            
+            clearBtn.style.display = 'block';
+            infoBanner.style.display = 'block';
+            
+            list.innerHTML = downloads.map((d, i) => `
+                <div class="download-item">
+                    <div class="download-info">
+                        <div class="download-name">
+                            ${d.name}
+                            <span class="gguf-badge">GGUF</span>
+                        </div>
+                        <div class="download-details">
+                            👤 ${d.author} • 📄 ${d.file} • 📦 ${d.size}<br>
+                            📁 ${d.folder} • 📅 ${d.date}
+                        </div>
+                    </div>
+                    <div class="download-actions">
+                        <button class="btn btn-secondary" onclick="openFolder('${d.folder}')">📂 Open</button>
+                        <button class="btn btn-danger" onclick="deleteDownload(${i})">🗑️ Remove</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function updateBadge() {
+            const downloads = getDownloads();
+            const badge = document.getElementById('downloadsBadge');
+            badge.textContent = downloads.length;
+            console.log('Badge updated:', downloads.length);
+        }
+
+        // ===================== ACTIONS =====================
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('hidden');
+            document.getElementById('mainContent').classList.toggle('expanded');
+        }
+
+        async function selectFolder() {
+            try {
+                folderHandle = await window.showDirectoryPicker();
+                const folderName = folderHandle.name;
+                document.getElementById('folderPath').textContent = folderName;
+                localStorage.setItem('cmdai_folder', folderName);
+                showToast('✅ Folder selected: ' + folderName, 'success');
+            } catch (e) {
+                if (e.name !== 'AbortError') {
+                    showToast('❌ Error selecting folder', 'error');
+                }
+            }
+        }
+
+        async function downloadModel(modelId) {
+            // Check folder
+            if (!folderHandle) {
+                const savedFolder = localStorage.getItem('cmdai_folder');
+                if (!savedFolder) {
+                    showToast('⚠️ Please select a folder in Settings first!', 'error');
+                    document.querySelector('[data-tab="settings"]').click();
+                    return;
+                }
+                showToast('⚠️ Click "Browse" to re-select the folder', 'error');
+                document.querySelector('[data-tab="settings"]').click();
+                return;
+            }
+            
+            const model = allModels.find(m => m.id === modelId);
+            if (!model || !model.ggufFiles?.length) {
+                showToast('❌ No files available for download', 'error');
+                return;
+            }
+            
+            const file = model.ggufFiles[0];
+            const safeId = modelId.replace(/\//g, '-');
+            const progressEl = document.getElementById(`progress-${safeId}`);
+            const fillEl = document.getElementById(`fill-${safeId}`);
+            const textEl = document.getElementById(`text-${safeId}`);
+            const speedEl = document.getElementById(`speed-${safeId}`);
+            
+            if (progressEl) progressEl.classList.add('active');
+            
+            try {
+                showToast('📥 Starting download...', 'success');
+                
+                const url = `https://huggingface.co/${modelId}/resolve/main/${file.path}`;
+                const res = await fetch(url);
+                
+                if (!res.ok) {
+                    throw new Error('Unable to download file');
+                }
+                
+                const reader = res.body.getReader();
+                const total = +res.headers.get('Content-Length') || file.size;
+                
+                let received = 0;
+                const chunks = [];
+                const start = Date.now();
+                
+                while (true) {
+                    const {done, value} = await reader.read();
+                    if (done) break;
+                    chunks.push(value);
+                    received += value.length;
+                    
+                    const pct = total ? (received / total * 100) : 0;
+                    const elapsed = (Date.now() - start) / 1000;
+                    const speed = elapsed > 0 ? received / elapsed / 1024 / 1024 : 0;
+                    
+                    if (fillEl) fillEl.style.width = pct + '%';
+                    if (textEl) textEl.textContent = Math.round(pct) + '%';
+                    if (speedEl) speedEl.textContent = speed.toFixed(1) + ' MB/s';
+                }
+                
+                const blob = new Blob(chunks);
+                const fileName = file.path.split('/').pop();
+                
+                // Save file
+                const fh = await folderHandle.getFileHandle(fileName, {create: true});
+                const writable = await fh.createWritable();
+                await writable.write(blob);
+                await writable.close();
+                
+                // Add to downloads list
+                const downloads = getDownloads();
+                const newDownload = {
+                    id: modelId,
+                    name: model.name,
+                    author: model.author,
+                    file: fileName,
+                    size: (blob.size / 1024 / 1024).toFixed(0) + ' MB',
+                    folder: folderHandle.name,
+                    date: new Date().toLocaleDateString('en-US'),
+                    timestamp: Date.now()
+                };
+                
+                // Check if already exists
+                const existingIndex = downloads.findIndex(d => d.id === modelId);
+                if (existingIndex >= 0) {
+                    downloads[existingIndex] = newDownload;
+                } else {
+                    downloads.push(newDownload);
+                }
+                
+                saveDownloads(downloads);
+                
+                // Refresh UI
+                updateBadge();
+                renderDownloads();
+                renderModels(displayedModels);
+                renderRanking();
+                
+                showToast('✅ Downloaded: ' + fileName + ' (' + (blob.size / 1024 / 1024).toFixed(0) + ' MB)', 'success');
+                
+            } catch (e) {
+                console.error('Download error:', e);
+                showToast('❌ Error: ' + e.message, 'error');
+            } finally {
+                setTimeout(() => {
+                    if (progressEl) progressEl.classList.remove('active');
+                }, 1000);
+            }
+        }
+
+        function deleteDownload(index) {
+            const downloads = getDownloads();
+            const item = downloads[index];
+            
+            if (confirm(`Remove "${item.name}" from the list?\n\nNote: The file will remain on disk in the "${item.folder}" folder.`)) {
+                downloads.splice(index, 1);
+                saveDownloads(downloads);
+                renderDownloads();
+                updateBadge();
+                renderModels(displayedModels);
+                renderRanking();
+                showToast('🗑️ Removed from list: ' + item.name, 'success');
+            }
+        }
+
+        function clearAllDownloads() {
+            const downloads = getDownloads();
+            
+            if (downloads.length === 0) {
+                showToast('📭 List is already empty', 'error');
+                return;
+            }
+            
+            if (confirm(`Remove all ${downloads.length} models from the list?\n\nNote: Files will remain on disk.`)) {
+                localStorage.removeItem('cmdai_downloads');
+                renderDownloads();
+                updateBadge();
+                renderModels(displayedModels);
+                renderRanking();
+                showToast('🗑️ Download list cleared', 'success');
+            }
+        }
+
+        function clearDownloadsList() {
+            clearAllDownloads();
+        }
+
+        function openFolder(folderName) {
+            showToast('📂 Folder: ' + folderName, 'success');
+            // Cannot open folder from browser — info only
+        }
+
+        function showDetails(modelId) {
+            const model = allModels.find(m => m.id === modelId);
+            if (!model) return;
+            
+            const downloads = getDownloads();
+            const isDownloaded = downloads.some(d => d.id === modelId);
+            
+            document.getElementById('modalTitle').textContent = model.name;
+            document.getElementById('modalContent').innerHTML = `
+                <div class="model-info-grid">
+                    <div class="model-info-item">
+                        <div class="model-info-label">Parameters</div>
+                        <div class="model-info-value">${model.params}</div>
+                    </div>
+                    <div class="model-info-item">
+                        <div class="model-info-label">Size</div>
+                        <div class="model-info-value">${model.ggufSizeGB} GB</div>
+                    </div>
+                    <div class="model-info-item">
+                        <div class="model-info-label">RAM</div>
+                        <div class="model-info-value">${model.ramRequired}</div>
+                    </div>
+                    <div class="model-info-item">
+                        <div class="model-info-label">Quantization</div>
+                        <div class="model-info-value">${model.quantType}</div>
+                    </div>
+                    <div class="model-info-item">
+                        <div class="model-info-label">Downloads</div>
+                        <div class="model-info-value">${formatNumber(model.downloads)}</div>
+                    </div>
+                    <div class="model-info-item">
+                        <div class="model-info-label">Ranking</div>
+                        <div class="model-info-value">⭐ ${model.ranking}/100</div>
+                    </div>
+                </div>
+                
+                <div style="margin-bottom: 20px;">
+                    <h4 style="font-weight: 700; margin-bottom: 10px; font-size: 14px;">Use Case</h4>
+                    <div class="model-usecases">
+                        ${model.useCases.map(uc => `<span class="category-tag category-${uc}">${uc}</span>`).join('')}
+                    </div>
+                </div>
+                
+                <div style="margin-bottom: 20px;">
+                    <h4 style="font-weight: 700; margin-bottom: 10px; font-size: 14px;">Description</h4>
+                    <p style="font-size: 14px; color: #4b5563; line-height: 1.7;">${model.description}</p>
+                </div>
+                
+                ${model.ggufFiles?.length ? `
+                <div style="margin-bottom: 20px;">
+                    <h4 style="font-weight: 700; margin-bottom: 10px; font-size: 14px;">GGUF Files</h4>
+                    <div class="gguf-files-list">
+                        ${model.ggufFiles.map(f => `
+                            <div class="gguf-file-item">
+                                <span class="gguf-file-name">${f.path}</span>
+                                <span class="gguf-file-size">${formatSize(f.size)}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+                ` : ''}
+                
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <a href="https://huggingface.co/${model.id}" target="_blank" class="btn btn-primary" style="text-decoration: none;">🔗 Hugging Face</a>
+                    <button class="btn btn-primary" onclick="downloadModel('${model.id}'); closeModal();" ${isDownloaded ? 'disabled' : ''}>
+                        ${isDownloaded ? '✅ Downloaded' : '⬇️ Download'}
+                    </button>
+                    <button class="btn btn-secondary" onclick="closeModal()">Close</button>
+                </div>
+            `;
+            document.getElementById('modelModal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('modelModal').classList.remove('active');
+        }
+
+        // ===================== VOTING =====================
+        function getVotes(modelId) {
+            try {
+                const data = localStorage.getItem('cmdai_votes');
+                const votes = data ? JSON.parse(data) : {};
+                return votes[modelId] || { up: 0, down: 0, userVote: null };
+            } catch (e) {
+                return { up: 0, down: 0, userVote: null };
+            }
+        }
+
+        function saveVotes(votes) {
+            try {
+                localStorage.setItem('cmdai_votes', JSON.stringify(votes));
+            } catch (e) {
+                console.error('Error saving votes:', e);
+            }
+        }
+
+        function vote(modelId, type) {
+            const data = localStorage.getItem('cmdai_votes');
+            const allVotes = data ? JSON.parse(data) : {};
+            
+            const v = allVotes[modelId] || {up: 0, down: 0, userVote: null};
+            
+            if (v.userVote === 'up') v.up--;
+            if (v.userVote === 'down') v.down--;
+            
+            if (v.userVote !== type) {
+                v[type]++;
+                v.userVote = type;
+            } else {
+                v.userVote = null;
+            }
+            
+            allVotes[modelId] = v;
+            saveVotes(allVotes);
+            
+            renderModels(displayedModels);
+        }
+
+        // ===================== CLEAR DATA =====================
+        function clearAllData() {
+            if (confirm('⚠️ Delete ALL data?\n\n• Downloaded models list\n• Votes\n• Folder settings\n\nThis action cannot be undone.')) {
+                localStorage.clear();
+                showToast('🗑️ All data cleared', 'success');
+                setTimeout(() => location.reload(), 1000);
+            }
+        }
+
+        // ===================== UTILITIES =====================
+        function formatNumber(n) {
+            if (n >= 1e9) return (n / 1e9).toFixed(1) + 'B';
+            if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+            if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+            return n.toString();
+        }
+
+        function formatSize(b) {
+            if (b >= 1e9) return (b / 1e9).toFixed(2) + ' GB';
+            if (b >= 1e6) return (b / 1e6).toFixed(1) + ' MB';
+            return (b / 1e3).toFixed(1) + ' KB';
+        }
+
+        function showToast(msg, type = 'success') {
+            const el = document.createElement('div');
+            el.className = `toast ${type}`;
+            el.textContent = msg;
+            document.getElementById('toastContainer').appendChild(el);
+            setTimeout(() => el.remove(), 4000);
+        }
+
+        // Close modal on overlay click
+        document.getElementById('modelModal').addEventListener('click', (e) => {
+            if (e.target.id === 'modelModal') closeModal();
+        });
+    </script>
+</body>
+</html>
